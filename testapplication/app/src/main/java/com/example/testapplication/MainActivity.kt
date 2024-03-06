@@ -32,9 +32,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
-import com.example.testapplication.Model.AccessPoint
+import com.example.testapplication.model.AccessPoint
 import com.example.testapplication.ui.theme.TestApplicationTheme
-import com.example.testapplication.utility.AccessPointPlacer
 import com.example.testapplication.utility.FileUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -61,7 +60,7 @@ fun FloorplanPickerAndDisplay() {
     var floorplanBitmap by remember { mutableStateOf<Bitmap?>(null) }
 
     var showDimensionDialog by remember { mutableStateOf(false) }
-    var accessPoints by remember { mutableStateOf<List<AccessPoint>?>(null) }
+    //    var accessPoints by remember { mutableStateOf<List<AccessPoint>?>(null) }
 
 
     val pickContentLauncher = rememberLauncherForActivityResult(
@@ -77,20 +76,16 @@ fun FloorplanPickerAndDisplay() {
         }
     }
 
-    if (showDimensionDialog) {
-        RequestDimensionsDialog { width, height ->
-            showDimensionDialog = false
-            // Use AccessPointPlacer to place access points
-            accessPoints = AccessPointPlacer.placeAccessPoints(width, height, 5f) // Assuming a coverage radius of 5 meters
-            // Logic to visually represent the access points on the floorplan
-        }
-    }
-
     Box(modifier = Modifier.fillMaxSize()) {
-        Button(onClick = { pickContentLauncher.launch("image/*") }) {
+        Button(
+            onClick =
+            {
+                pickContentLauncher.launch("image/*")
+            }
+        )
+        {
             Text("Please choose a Floorplan (picture or a pdf)")
         }
-
         floorplanBitmap?.let { bitmap ->
             Image(
                 bitmap = bitmap.asImageBitmap(),
@@ -98,6 +93,16 @@ fun FloorplanPickerAndDisplay() {
                 modifier = Modifier.fillMaxSize(),
                 contentScale = ContentScale.Fit
             )
+
+            showDimensionDialog = true
+            if (showDimensionDialog) {
+                RequestDimensionsDialog { width, height -> showDimensionDialog = false
+//            accessPoints = AccessPointPlacer.placeAccessPoints(width, height, 5f)
+                }
+                showDimensionDialog = false
+            }
+
+
         }
     }
 }
