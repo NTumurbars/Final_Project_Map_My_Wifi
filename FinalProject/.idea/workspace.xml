@@ -24,26 +24,38 @@
       <ProjectState />
     </projectState>
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 3
-}]]></component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Kotlin Class" />
+        <option value="Kotlin File" />
+      </list>
+    </option>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3
+}</component>
   <component name="ProjectId" id="2dVZs7jI5V4XLIbj2r8HKURpwGH" />
   <component name="ProjectViewState">
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.cidr.known.project.marker": "true",
-    "cf.first.check.clang-format": "false",
-    "cidr.known.project.marker": "true",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "C:/Users/tumur/AndroidStudioProjects/FinalProject/app/src/main/java/com/example/finalproject"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ResourceManagerPrefKey.ResourceType&quot;: &quot;DRAWABLE&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;cf.first.check.clang-format&quot;: &quot;false&quot;,
+    &quot;cidr.known.project.marker&quot;: &quot;true&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/tumur/AndroidStudioProjects/FinalProject/app/src/main/java/com/example/finalproject&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\tumur\AndroidStudioProjects\FinalProject\app\src\main\java\com\example\finalproject" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
       <recent name="C:\Users\tumur\AndroidStudioProjects\FinalProject\app\src\main\java\com\example\finalproject" />
     </key>
     <key name="CopyKotlinDeclarationDialog.RECENTS_KEY">
@@ -129,5 +141,12 @@
       <updated>1710095410126</updated>
     </task>
     <servers />
+  </component>
+  <component name="XDebuggerManager">
+    <watches-manager>
+      <configuration name="AndroidRunConfigurationType">
+        <watch expression="accessPoints" language="kotlin" />
+      </configuration>
+    </watches-manager>
   </component>
 </project>
