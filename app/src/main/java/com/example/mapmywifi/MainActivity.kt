@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -34,6 +35,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
@@ -41,9 +43,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Dialog
-import coil.compose.rememberAsyncImagePainter
-import coil.request.ImageRequest
 import com.example.mapmywifi.ui.theme.MapMyWifiTheme
+import com.google.accompanist.coil.rememberImagePainter
 import kotlin.math.ceil
 
 class MainActivity : ComponentActivity() {
@@ -70,11 +71,10 @@ fun FloorplanPickerAndDisplay() {
     var isLoading by remember { mutableStateOf(true) }
 
     // Fetch Access Point Types
-    LaunchedEffect(key1 = true) {
+    LaunchedEffect(Unit) {
         isLoading = true
-        accessPointTypes = try {
-            AccessPointTypes.fetchAccessPointTypes()
-        } finally {
+        coroutineScope.launch {
+            accessPointTypes = AccessPointTypes.fetchAccessPointTypes() ?: emptyList()
             isLoading = false
         }
     }
@@ -120,49 +120,16 @@ fun FloorplanPickerAndDisplay() {
         }
 
 
-    //dimensions and scaling related variables
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
 
 
-    val scaleBitmapToBox = remember(floorplanBitmap, boxSize) {
-        floorplanBitmap?.let { bitmap ->
-            boxSize.width.toFloat() / bitmap.width.toFloat()
+    val screenScale = remember(boxSize, floorplanWidthInMeters) {
+        floorplanWidthInMeters?.let { widthInMeters ->
+            if (widthInMeters > 0) boxSize.width.toFloat() / widthInMeters else 1f
         } ?: 1f
     }
 
-    val floorplanWidthInPx = boxSize.width.toFloat()
 
-
-    val floorplanHeightInPx = remember(floorplanBitmap, scaleBitmapToBox) {
-        floorplanBitmap?.let { bitmap ->
-            bitmap.height.toFloat() * scaleBitmapToBox
-        } ?: 0f
-    }
-
-    val scaleMeterToPx = remember(floorplanWidthInPx, floorplanWidthInMeters) {
-        (floorplanWidthInMeters?.takeIf { it > 0 }?.let { floorplanWidthInPx / it }) ?: 1f
-    }
-
-    //omg finally this thing is working. god damn these remember states
-    LaunchedEffect(floorplanWidthInMeters, floorplanHeightInMeters, accessPointTypes) {
-        val widthMeters = floorplanWidthInMeters
-        val heightMeters = floorplanHeightInMeters
-        if (widthMeters != null && widthMeters > 0 &&
-            heightMeters != null && heightMeters > 0 && accessPointTypes.isNotEmpty()) {
-
-            val localScaleMeterToPx = floorplanWidthInPx / widthMeters
-
-            val autoPlacedAPs = calculateAccessPointPositions(
-                floorplanWidth = floorplanWidthInPx,
-                floorplanHeight = floorplanHeightInPx,
-                scale = localScaleMeterToPx,
-                apType = accessPointTypes.first()
-            )
-
-            accessPoints.clear()
-            accessPoints.addAll(autoPlacedAPs)
-        }
-    }
 
 
 
@@ -199,7 +166,7 @@ fun FloorplanPickerAndDisplay() {
             accessPoints.forEachIndexed { index, ap ->
                 AccessPointDraggable(
                     accessPoint = ap,
-                    screenScale = scaleMeterToPx,
+                    screenScale = screenScale,
                     onUpdate = { updatedAp ->
                         accessPoints[index] = updatedAp
                     },
@@ -243,7 +210,16 @@ fun FloorplanPickerAndDisplay() {
                 floorplanHeightInMeters = height
                 showDimensionDialog = false
 
+                // Use first AccessPointType for auto-placement
+                val autoPlacedAPs = calculateAccessPointPositions(
+                    width = width,
+                    height = height,
+                    scale = screenScale,
+                    apType = accessPointTypes.first()
+                )
 
+                accessPoints.clear()
+                accessPoints.addAll(autoPlacedAPs)
             } else {
                 showDialogInvalidInput = true
             }
@@ -265,10 +241,19 @@ fun FloorplanPickerAndDisplay() {
             showAccessPointSelectionDialog = false
             selectedType?.let { type ->
 
-                val newX = floorplanWidthInPx / 2f
 
+                // box width is fine since it fits to it
+                val newX = boxSize.width / 2f
 
-                val newY = floorplanHeightInPx / 2f
+                // need a scale factor to know the height of the floorplan displayed inside the box
+
+                val scaleFactor = floorplanBitmap?.let { bitmap ->
+                    boxSize.width.toFloat() / bitmap.width.toFloat()
+                } ?: 1f // Default scale factor if floorplanBitmap is null.
+
+                val newY = floorplanBitmap?.let { bitmap ->
+                    (bitmap.height.toFloat() * scaleFactor) / 2f
+                } ?: 0f
 
                 accessPoints.add(AccessPointInstance(type = type, x = newX, y = newY))
             }
@@ -276,42 +261,34 @@ fun FloorplanPickerAndDisplay() {
     }
 }
 
-
 fun calculateAccessPointPositions(
-    floorplanWidth: Float,
-    floorplanHeight: Float,
+    width: Float,
+    height: Float,
     scale: Float,
     apType: AccessPointType
-): List<AccessPointInstance> {
-    val accessPointPositions = mutableListOf<AccessPointInstance>()
+): SnapshotStateList<AccessPointInstance> {
+    val positions = mutableStateListOf<AccessPointInstance>()
+    val range = apType.range
 
-    // need diamer
-    val coverageDiameter = apType.range * scale * 2
 
-    // getting required number of ap hor and ver
-    val numAPsHorizontal = ceil(floorplanWidth / coverageDiameter).toInt()
-    val numAPsVertical = ceil(floorplanHeight / coverageDiameter).toInt()
 
-    // Calculate the spacing
-    val horizontalSpacing = floorplanWidth / numAPsHorizontal
-    val verticalSpacing = floorplanHeight / numAPsVertical
+    val requiredNumberHorizontal = ceil(width/range).toInt()
+    val requiredNumberVertical = ceil(height/range).toInt()
 
-    // Place an AP in the center of each coverage rectangle
-    for (i in 0 until numAPsHorizontal) {
-        for (j in 0 until numAPsVertical) {
-            val xPosition = (i * horizontalSpacing) + (horizontalSpacing / 2)
-            val yPosition = (j * verticalSpacing) + (verticalSpacing / 2)
-            accessPointPositions.add(AccessPointInstance(
-                type = apType,
-                x = xPosition,
-                y = yPosition
-            ))
+
+    for(i in 1..requiredNumberHorizontal)
+    {
+        for(j in 1..requiredNumberVertical)
+        {
+            val x = width/i * scale
+            val y = height/j * scale
+            positions.add(AccessPointInstance(apType, x = x, y = y))
         }
+
     }
 
-    return accessPointPositions
+    return positions
 }
-
 
 
 @Composable
@@ -324,7 +301,8 @@ fun AccessPointDraggable(
     var offset by remember { mutableStateOf(Offset(accessPoint.x, accessPoint.y)) }
     var showDelete by remember { mutableStateOf(false) }
     val baseIconSize = 30.dp
-    val iconHalfSizePx = with(LocalDensity.current) { (baseIconSize / 2).toPx() }
+    val iconSize = baseIconSize
+    val iconHalfSizePx = with(LocalDensity.current) { (iconSize / 2).toPx() }
 
     LaunchedEffect(key1 = accessPoint) {
         offset = Offset(accessPoint.x , accessPoint.y)
@@ -348,18 +326,17 @@ fun AccessPointDraggable(
 
     // AP Icon, centered
     Image(
-        painter =
-        rememberAsyncImagePainter(ImageRequest.Builder(LocalContext.current).data(
-            data = accessPoint.type.imageUrl
-        ).apply(block = fun ImageRequest.Builder.() {
-            crossfade(true)
-            error(R.drawable.ic_launcher_background)
-        }).build()
+        painter = rememberImagePainter(
+            data = accessPoint.type.imageUrl, // Update this to the imageUrl from your AccessPointType
+            builder = {
+                crossfade(true)
+                error(R.drawable.placeholder) // Replace with your placeholder drawable
+            }
         ),
         contentDescription = "Access Point",
         modifier = Modifier
             .offset { IntOffset((offset.x - iconHalfSizePx).roundToInt(), (offset.y - iconHalfSizePx).roundToInt()) }
-            .size(baseIconSize)
+            .size(iconSize)
             .clipToBounds()
             .clickable { showDelete = !showDelete }
             .then(dragGestureModifier)
@@ -374,7 +351,7 @@ fun AccessPointDraggable(
             },
             modifier = Modifier
                 .offset { IntOffset((offset.x - iconHalfSizePx).roundToInt(), (offset.y + iconHalfSizePx).roundToInt()) }
-                .size(baseIconSize)
+                .size(iconSize)
         ) {
             Icon(
                 imageVector = Icons.Default.Delete,
@@ -465,6 +442,7 @@ fun ProposalSummaryDialog(summary: ProposalSummary, onClose: () -> Unit) {
                 val totalMonthlyManagementFee = totalDevices * 500
                 val totalRentalMonthly = summary.proposalOptions.sumOf { it.quantity * (it.accessPointType.rentalCost + 500) } + summary.visitationFee
                 val totalPurchaseOneTime = summary.proposalOptions.sumOf { it.quantity * it.accessPointType.purchaseCost } + summary.visitationFee
+                val totalMonthlyPurchase = totalMonthlyManagementFee
 
                 Spacer(modifier = Modifier.height(8.dp))
 
@@ -479,7 +457,7 @@ fun ProposalSummaryDialog(summary: ProposalSummary, onClose: () -> Unit) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Purchase Fees:", fontWeight = FontWeight.Bold)
                         Text("Total One-time (incl. Visitation Fee): ¥$totalPurchaseOneTime", fontWeight = FontWeight.Bold)
-                        Text("Total Monthly Fee: ¥$totalMonthlyManagementFee", fontWeight = FontWeight.Bold)
+                        Text("Total Monthly Fee: ¥$totalMonthlyPurchase", fontWeight = FontWeight.Bold)
                     }
                 }
 
